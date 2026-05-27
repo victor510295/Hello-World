@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>旅遊合約 AI 審查系統</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+      background: #f5f7fa;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+      color: #fff;
+      padding: 24px 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    }
+    header h1 { font-size: 1.6rem; font-weight: 700; }
+    header p { margin-top: 4px; opacity: 0.7; font-size: 0.9rem; }
+
+    main { max-width: 960px; margin: 32px auto; padding: 0 16px 64px; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; color: #0f3460; }
+
+    label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 6px; color: #555; }
+    textarea {
+      width: 100%;
+      border: 1px solid #dde1e7;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.88rem;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 100px;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { outline: none; border-color: #0f3460; box-shadow: 0 0 0 3px rgba(15,52,96,0.1); }
+
+    .field-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    @media (max-width: 700px) { .field-group { grid-template-columns: 1fr; } }
+
+    .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 2px 8px;
+           border-radius: 99px; margin-bottom: 8px; letter-spacing: 0.05em; }
+    .tag-contract { background: #dbeafe; color: #1d4ed8; }
+    .tag-itinerary { background: #d1fae5; color: #065f46; }
+    .tag-chat { background: #fef3c7; color: #92400e; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 24px; border: none; border-radius: 8px; font-size: 0.95rem;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: #0f3460; color: #fff; }
+    .btn-primary:hover { background: #16213e; }
+    .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
+    .btn-secondary { background: #e5e7eb; color: #374151; }
+    .btn-secondary:hover { background: #d1d5db; }
+
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #results { display: none; }
+
+    .score-banner {
+      display: flex; align-items: center; gap: 16px; padding: 20px;
+      border-radius: 10px; margin-bottom: 20px;
+    }
+    .score-circle {
+      width: 72px; height: 72px; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; font-size: 1.5rem;
+      font-weight: 800; color: #fff; flex-shrink: 0;
+    }
+    .score-text h3 { font-size: 1rem; font-weight: 600; }
+    .score-text p { font-size: 0.88rem; opacity: 0.85; margin-top: 4px; }
+
+    .risk-red    { background: #fee2e2; border: 1px solid #fca5a5; }
+    .risk-yellow { background: #fef9c3; border: 1px solid #fde047; }
+    .risk-green  { background: #d1fae5; border: 1px solid #6ee7b7; }
+    .circle-red    { background: #dc2626; }
+    .circle-yellow { background: #ca8a04; }
+    .circle-green  { background: #059669; }
+
+    .finding {
+      border-radius: 10px; padding: 16px; margin-bottom: 12px;
+    }
+    .finding-header {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .finding-header h4 { font-size: 0.95rem; font-weight: 600; }
+    .badge {
+      font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .badge-red    { background: #fca5a5; color: #7f1d1d; }
+    .badge-yellow { background: #fde047; color: #78350f; }
+    .badge-green  { background: #6ee7b7; color: #064e3b; }
+
+    .finding-meta { font-size: 0.78rem; color: #6b7280; margin-bottom: 8px; }
+    .finding p { font-size: 0.88rem; line-height: 1.6; margin-bottom: 6px; }
+    .citation {
+      background: rgba(0,0,0,0.04); border-left: 3px solid #9ca3af;
+      padding: 8px 12px; border-radius: 4px; font-size: 0.83rem;
+      font-style: italic; color: #374151; margin: 8px 0;
+    }
+    .recommendation { font-weight: 500; color: #0f3460; }
+
+    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer; }
+    .checkbox-row input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
+
+    .tone-select { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .tone-btn {
+      padding: 6px 16px; border: 2px solid #dde1e7; border-radius: 99px;
+      background: #fff; font-size: 0.85rem; cursor: pointer; font-weight: 500;
+      transition: all 0.15s;
+    }
+    .tone-btn.active { border-color: #0f3460; background: #0f3460; color: #fff; }
+
+    .message-card {
+      border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 12px;
+    }
+    .message-card h4 { font-size: 0.88rem; font-weight: 600; color: #0f3460; margin-bottom: 4px; }
+    .message-card .subject { font-size: 0.83rem; color: #6b7280; margin-bottom: 10px; }
+    .message-card pre {
+      background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;
+      padding: 12px; font-size: 0.85rem; line-height: 1.7; white-space: pre-wrap;
+      font-family: inherit;
+    }
+    .copy-btn {
+      margin-top: 8px; padding: 5px 12px; font-size: 0.8rem; border-radius: 6px;
+      border: 1px solid #dde1e7; background: #fff; cursor: pointer;
+    }
+    .copy-btn:hover { background: #f3f4f6; }
+
+    .error-box {
+      background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px;
+      padding: 12px 16px; color: #7f1d1d; font-size: 0.88rem;
+    }
+
+    .dim-label {
+      font-size: 0.75rem; padding: 2px 7px; border-radius: 99px;
+      background: #e0e7ff; color: #3730a3; font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>✈️ 旅遊合約 AI 審查系統</h1>
+  <p>協助消費者理解合約條款、識別風險，並生成溝通訊息</p>
+</header>
+
+<main>
+
+  <!-- Step 1: Upload Documents -->
+  <div class="card">
+    <h2>📄 第一步：貼上文件內容</h2>
+    <div class="field-group">
+      <div>
+        <span class="tag tag-contract">[CONTRACT]</span>
+        <label>合約正文</label>
+        <textarea id="contract" placeholder="貼上旅遊合約正文…" rows="6"></textarea>
+      </div>
+      <div>
+        <span class="tag tag-itinerary">[ITINERARY]</span>
+        <label>行程說明</label>
+        <textarea id="itinerary" placeholder="貼上行程說明內容…" rows="6"></textarea>
+      </div>
+      <div>
+        <span class="tag tag-chat">[CHAT]</span>
+        <label>通訊記錄</label>
+        <textarea id="chat" placeholder="貼上 LINE / WhatsApp / Email 記錄…" rows="6"></textarea>
+      </div>
+    </div>
+
+    <div style="margin-top:20px; display:flex; align-items:center; gap:12px;">
+      <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()">
+        <span>開始健檢</span>
+      </button>
+      <span id="analyzeStatus" style="font-size:0.85rem;color:#6b7280;"></span>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <div id="errorBox" class="error-box" style="display:none;margin-bottom:16px;"></div>
+
+    <!-- Score Banner -->
+    <div class="card" id="scoreBanner">
+      <h2>📊 整體風險評估</h2>
+      <div id="scoreContent"></div>
+      <div id="findingsList" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- Message Generator -->
+    <div class="card" id="msgCard" style="display:none;">
+      <h2>💬 第二步：生成溝通訊息</h2>
+      <p style="font-size:0.88rem;color:#6b7280;margin-bottom:14px;">
+        勾選需要跟進的問題，選擇溝通語氣，再生成可直接使用的訊息。
+      </p>
+      <div id="findingCheckboxes"></div>
+
+      <div style="margin-top:14px;">
+        <label style="margin-bottom:8px;">溝通語氣</label>
+        <div class="tone-select">
+          <button class="tone-btn active" onclick="setTone('polite', this)">禮貌</button>
+          <button class="tone-btn" onclick="setTone('firm', this)">堅定</button>
+          <button class="tone-btn" onclick="setTone('formal', this)">正式</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="msgBtn" onclick="generateMessages()">
+        <span>生成訊息</span>
+      </button>
+
+      <div id="messagesOutput" style="margin-top:20px;"></div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+  let analysisResult = null;
+  let selectedTone = 'polite';
+
+  const DIMENSION_MAP = {
+    promise_gap: '口頭承諾落差',
+    biased_clause: '不公平條款',
+    clarity: '行程明確性',
+    cancellation: '取消與退款',
+    needs_written_confirmation: '需書面確認',
+    evidence_to_keep: '保存證據建議',
+  };
+
+  function setTone(tone, el) {
+    selectedTone = tone;
+    document.querySelectorAll('.tone-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function riskClass(level) {
+    return { red: 'risk-red', yellow: 'risk-yellow', green: 'risk-green' }[level] || '';
+  }
+  function circleClass(level) {
+    return { red: 'circle-red', yellow: 'circle-yellow', green: 'circle-green' }[level] || '';
+  }
+  function badgeClass(level) {
+    return { red: 'badge-red', yellow: 'badge-yellow', green: 'badge-green' }[level] || '';
+  }
+  function levelLabel(level) {
+    return { red: '🔴 高風險', yellow: '🟡 需注意', green: '🟢 良好' }[level] || level;
+  }
+
+  function scoreColor(score) {
+    if (score >= 70) return '#dc2626';
+    if (score >= 30) return '#ca8a04';
+    return '#059669';
+  }
+
+  async function analyze() {
+    const contract = document.getElementById('contract').value;
+    const itinerary = document.getElementById('itinerary').value;
+    const chat = document.getElementById('chat').value;
+
+    if (!contract.trim() && !itinerary.trim() && !chat.trim()) {
+      alert('請至少填寫一份文件內容');
+      return;
+    }
+
+    const btn = document.getElementById('analyzeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div><span>分析中…</span>';
+    document.getElementById('analyzeStatus').textContent = '';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('errorBox').style.display = 'none';
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documents: { contract, itinerary, chat } }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || '分析失敗');
+      }
+
+      analysisResult = data;
+      renderResults(data);
+      document.getElementById('results').style.display = 'block';
+      document.getElementById('msgCard').style.display = 'block';
+    } catch (e) {
+      document.getElementById('errorBox').textContent = '錯誤：' + e.message;
+      document.getElementById('errorBox').style.display = 'block';
+      document.getElementById('results').style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span>開始健檢</span>';
+    }
+  }
+
+  function renderResults(data) {
+    const score = data.overall_risk_score;
+    const level = score >= 70 ? 'red' : score >= 30 ? 'yellow' : 'green';
+    const levelTxt = score >= 70 ? '高風險' : score >= 30 ? '中等風險' : '低風險';
+
+    document.getElementById('scoreContent').innerHTML = `
+      <div class="score-banner ${riskClass(level)}">
+        <div class="score-circle ${circleClass(level)}">${score}</div>
+        <div class="score-text">
+          <h3>整體風險：${levelTxt}</h3>
+          <p>${data.summary}</p>
+        </div>
+      </div>`;
+
+    const list = document.getElementById('findingsList');
+    list.innerHTML = data.findings.map(f => `
+      <div class="finding ${riskClass(f.risk_level)}">
+        <div class="finding-header">
+          <h4>${f.title}</h4>
+          <span class="badge ${badgeClass(f.risk_level)}">${levelLabel(f.risk_level)}</span>
+        </div>
+        <div class="finding-meta">
+          <span class="dim-label">${DIMENSION_MAP[f.dimension] || f.dimension}</span>
+          &nbsp;風險分數：${f.risk_score}／100 &nbsp;｜&nbsp; ID: ${f.id}
+        </div>
+        <p>${f.description}</p>
+        <div class="citation">引用：${f.citation}</div>
+        <p class="recommendation">💡 建議：${f.recommendation}</p>
+      </div>`).join('');
+
+    // Checkboxes for message generator
+    const cb = document.getElementById('findingCheckboxes');
+    const nonGreen = data.findings.filter(f => f.risk_level !== 'green');
+    if (nonGreen.length === 0) {
+      cb.innerHTML = '<p style="font-size:0.88rem;color:#6b7280;">沒有需要跟進的問題。</p>';
+      document.getElementById('msgBtn').style.display = 'none';
+    } else {
+      cb.innerHTML = nonGreen.map(f => `
+        <label class="checkbox-row">
+          <input type="checkbox" value="${f.id}" checked />
+          <span><strong>${f.id}</strong> — ${f.title}
+          <span class="badge ${badgeClass(f.risk_level)}" style="margin-left:6px;">${levelLabel(f.risk_level)}</span></span>
+        </label>`).join('');
+      document.getElementById('msgBtn').style.display = '';
+    }
+  }
+
+  async function generateMessages() {
+    const checked = Array.from(document.querySelectorAll('#findingCheckboxes input:checked')).map(i => i.value);
+    if (checked.length === 0) {
+      alert('請至少勾選一個問題');
+      return;
+    }
+
+    const btn = document.getElementById('msgBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div><span>生成中…</span>';
+    document.getElementById('messagesOutput').innerHTML = '';
+
+    try {
+      const res = await fetch('/api/generate-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          findings: analysisResult.findings,
+          tone: selectedTone,
+          finding_ids: checked,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || '生成失敗');
+
+      document.getElementById('messagesOutput').innerHTML = data.messages.map(m => `
+        <div class="message-card">
+          <h4>${m.finding_id} — ${m.tone}</h4>
+          <div class="subject">主旨：${m.subject}</div>
+          <pre id="msg-${m.finding_id}">${escapeHtml(m.message)}</pre>
+          <button class="copy-btn" onclick="copyMsg('msg-${m.finding_id}', this)">📋 複製</button>
+        </div>`).join('');
+    } catch (e) {
+      document.getElementById('messagesOutput').innerHTML =
+        `<div class="error-box">錯誤：${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span>生成訊息</span>';
+    }
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function copyMsg(id, btn) {
+    const text = document.getElementById(id).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✅ 已複製';
+      setTimeout(() => btn.textContent = '📋 複製', 2000);
+    });
+  }
+</script>
+
+</body>
+</html>
